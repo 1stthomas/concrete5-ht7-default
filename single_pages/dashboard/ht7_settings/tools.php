@@ -6,7 +6,7 @@
     <?php if (count($pages)): ?>
         <?php foreach ($pages as $page): ?>
             <p>
-                <a href="<?= $page->getCollectionLink(); ?>" title=""><?= $page->getCollectionName(); ?></a>
+                <a href="<?= $page->getCollectionLink(); ?>" title="<?= $page->getCollectionDescription(); ?>"><?= $page->getCollectionName(); ?></a>
             </p>
         <?php endforeach; ?>
     <?php else: ?>

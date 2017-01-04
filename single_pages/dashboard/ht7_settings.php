@@ -9,14 +9,14 @@ defined('C5_EXECUTE') or die("Access Denied.");
             <div class="row">
         <?php endif; ?>
         <div class="col-md-4 ccm-dashboard-section-menu">
-            <h2><?=$page->getCollectionName();?></h2>
+            <h2 title="<?= $page->getCollectionDescription(); ?>"><?=$page->getCollectionName();?></h2>
             <?php
             $children = $page->getCollectionChildren();
             if (count($children) > 0):
                 ?>
                 <?php foreach ($children as $child): ?>
                     <p>
-                        <a href="<?= $child->getCollectionLink(); ?>">
+                        <a href="<?= $child->getCollectionLink(); ?>" title="<?= $page->getCollectionDescription(); ?>">
                             <?= $child->getCollectionName(); ?>
                         </a>
                     </p>
