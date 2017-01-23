@@ -1,6 +1,8 @@
 <?php
 namespace Concrete\Package\Ht7Default\Controller\SinglePage\Dashboard;
 
+defined('C5_EXECUTE') or die('Access Denied.');
+
 use \Concrete\Core\Page\Controller\DashboardPageController;
 use Page;
 
