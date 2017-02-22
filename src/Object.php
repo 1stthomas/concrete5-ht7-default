@@ -14,6 +14,12 @@ class Object implements Serializable, JsonSerializable
      * @var     array    Indexed array    
      */
     protected $exportVars;
+    /**
+     * The default value which will be set to the object variables on reset().
+     * 
+     * @var     mixed
+     */
+    protected $resetValue;
     
     /**
      * Creates an object which has extended export/import functionallity.<br />
@@ -28,6 +34,11 @@ class Object implements Serializable, JsonSerializable
     {
         if (isset($options['exportVariables'])) {
             $this->setExportVariables($options['exportVariables']);
+        }
+        if (isset($options['resetValue'])) {
+            $this->setResetValue($options['resetValue']);
+        } else {
+            $this->setResetValue();
         }
         $data ? $this->load($data) : '';
     }
@@ -68,18 +79,36 @@ class Object implements Serializable, JsonSerializable
     {
         if (is_string($data)) {
             $this->unserialize($data);
-        } elseif (!is_array($data)) {
+        } elseif (!is_array($data) && !is_object($data)) {
             throw new Exception('Wrong data type: ' . gettype($data) . ' found - array or string needed', E_USER_ERROR);
         } else {
-            foreach ($data as $key => $value) {
-                if (!empty($this->exportVars) && in_array($key, $this->exportVars)) {
-                    call_user_func_array([$this, 'set' . ucfirst($key)], [$value]);
-                } elseif (is_callable([$this, 'set' . ucfirst($key)])) {
-                    call_user_func_array([$this, 'set' . ucfirst($key)], [$value]);
-                }
+            $this->loadObject($data);
+        }
+    }
+    /**
+     * Loads the data of an array or object into this object.
+     * 
+     * @param   mixed           $data       Assoc array or object with the variables to import.
+     */
+    public function loadObject($data)
+    {
+        foreach ($data as $key => $value) {
+            if (!empty($this->exportVars) && in_array($key, $this->exportVars)) {
+                call_user_func_array([$this, 'set' . ucfirst($key)], [$value]);
+            } elseif (is_callable([$this, 'set' . ucfirst($key)])) {
+                call_user_func_array([$this, 'set' . ucfirst($key)], [$value]);
             }
         }
-        
+    }
+    /**
+     * Resets the object variables to the default value.
+     */
+    public function reset()
+    {
+        $vars = get_object_vars($this);
+        foreach ($vars as $key => $value) {
+            $this->$key = $this->resetValue;
+        }
     }
     /**
      * Serializes this object by checking if there is a set method of the variable.<br />
@@ -117,9 +146,18 @@ class Object implements Serializable, JsonSerializable
         }
     }
     /**
+     * Sets the value which will be set to the object valriables if reset() is called.
+     * 
+     * @param   mixed       $resetValue     The reset value.
+     */
+    public function setResetValue($resetValue = null)
+    {
+        $this->resetValue = $resetValue;
+    }
+    /**
      * Unserializes the commited data and fills this class or an extender of this class with the data.
      * 
-     * @param   string      $data       A serialized string of an extender of this class.
+     * @param   string      $data           A serialized string of an extender of this class.
      * @throws  Exception
      */
     public function unserialize($data)
