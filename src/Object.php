@@ -15,6 +15,24 @@ class Object implements Serializable, JsonSerializable
      */
     protected $exportVars;
     /**
+     * Whetever the export vars is set or not.
+     * 
+     * @var     boolean
+     */
+    protected $hasExportVars;
+    /**
+     * Set this variable true to restrict the import/export to variables with an associated method.
+     * 
+     * @var     boolean
+     */
+    protected $hasMethodRestriction;
+    /**
+     * Set this variable true to restrict the import/export to variables with an explicit class variable declaration.
+     * 
+     * @var     boolean
+     */
+    protected $hasVarRestriction;
+    /**
      * The default value which will be set to the object variables on reset().
      * 
      * @var     mixed
@@ -34,11 +52,23 @@ class Object implements Serializable, JsonSerializable
     {
         if (isset($options['exportVariables'])) {
             $this->setExportVariables($options['exportVariables']);
+        } else {
+            $this->hasExportVars = false;
         }
         if (isset($options['resetValue'])) {
             $this->setResetValue($options['resetValue']);
         } else {
             $this->setResetValue();
+        }
+        if (isset($options['hasMethodRestriction'])) {
+            $this->hasMethodRestriction = $options['hasMethodRestriction'];
+        } else {
+            $this->hasMethodRestriction = false;
+        }
+        if (isset($options['hasVarRestriction'])) {
+            $this->hasVarRestriction = $options['hasVarRestriction'];
+        } else {
+            $this->hasVarRestriction = false;
         }
         $data ? $this->load($data) : '';
     }
@@ -53,17 +83,32 @@ class Object implements Serializable, JsonSerializable
     {
         $vars = get_object_vars($this);
         $vars2Export = [];
-        $useExportVars = empty($this->exportVars) ? false : true;
         foreach ($vars as $key => $value) {
-            if ($useExportVars) {
-                if (in_array($key, $this->exportVars) && is_callable([$this, 'get' . ucfirst($key)])) {
-                    $vars2Export[$key] = call_user_method('get' . ucfirst($key), $this);
-                } else {
-                    
+            if ($this->hasExportVars) {
+                if (in_array($key, $this->exportVars)) {
+                    if ($this->hasMethodRestriction) {
+                        if (is_callable([$this, 'get' . ucfirst($key)])) {
+                            $vars2Export[$key] = call_user_method('get' . ucfirst($key), $this);
+                        }
+                    } else {
+                        if (is_callable([$this, 'get' . ucfirst($key)])) {
+                            $vars2Export[$key] = call_user_method('get' . ucfirst($key), $this);
+                        } else {
+                            $vars2Export[$key] = $this->$key;
+                        }
+                    }
                 }
             } else {
-                if (is_callable([$this, 'set' . ucfirst($key)])) {
-                    $vars2Export[$key] = call_user_method('get' . ucfirst($key), $this);
+                if ($this->hasMethodRestriction) {
+                    if (is_callable([$this, 'get' . ucfirst($key)])) {
+                        $vars2Export[$key] = call_user_method('get' . ucfirst($key), $this);
+                    }
+                } else {
+                    if (is_callable([$this, 'get' . ucfirst($key)])) {
+                        $vars2Export[$key] = call_user_method('get' . ucfirst($key), $this);
+                    } else {
+                        $vars2Export[$key] = $this->$key;
+                    }
                 }
             }
         }
@@ -92,11 +137,46 @@ class Object implements Serializable, JsonSerializable
      */
     public function loadObject($data)
     {
+        $vars = get_object_vars($this);
         foreach ($data as $key => $value) {
-            if (!empty($this->exportVars) && in_array($key, $this->exportVars)) {
-                call_user_func_array([$this, 'set' . ucfirst($key)], [$value]);
-            } elseif (is_callable([$this, 'set' . ucfirst($key)])) {
-                call_user_func_array([$this, 'set' . ucfirst($key)], [$value]);
+            if ($this->hasExportVars && in_array($key, $this->exportVars)) {
+                if ($this->hasMethodRestriction) {
+                    call_user_func_array([$this, 'set' . ucfirst($key)], [$value]);
+                } else {
+                    if (is_callable([$this, 'set' . ucfirst($key)])) {
+                        call_user_func_array([$this, 'set' . ucfirst($key)], [$value]);
+                    } else {
+                        if ($this->hasVarRestriction) {
+                            if (key_exists($key, $vars)) {
+                                $this->$key = $value;
+                            } else {
+                                // in debug mode throw exception??
+                            }
+                        } else {
+                            $this->$key = $value;
+                        }
+                    }
+                }
+            } elseif (!$this->hasExportVars) {
+                if ($this->hasMethodRestriction) {
+                    if (is_callable([$this, 'set' . ucfirst($key)])) {
+                        call_user_func_array([$this, 'set' . ucfirst($key)], [$value]);
+                    }
+                } elseif ($this->hasVarRestriction) {
+                    if (is_callable([$this, 'set' . ucfirst($key)])) {
+                        call_user_func_array([$this, 'set' . ucfirst($key)], [$value]);
+                    } elseif (key_exists($key, $vars)) {
+                        $this->$key = $value;
+                    }
+                } else {
+                    if (is_callable([$this, 'set' . ucfirst($key)])) {
+                        call_user_func_array([$this, 'set' . ucfirst($key)], [$value]);
+                    } else {
+                        $this->$key = $value;
+                    }
+                }
+            } else {
+                // in debug mode throw exception??
             }
         }
     }
@@ -135,6 +215,7 @@ class Object implements Serializable, JsonSerializable
                 }
                 if (!empty($exportVarsSanitized)) {
                     $this->exportVars = $exportVarsSanitized;
+                    $this->hasExportVars = true;
                 } else {
                     throw new Exception(t('The commited array had not valid variable names!'));
                 }
@@ -144,6 +225,15 @@ class Object implements Serializable, JsonSerializable
         } else {
             throw new Exception(t('Wrong datatype commited. %s found, %s needed.', [gettype($exportVars), 'array']));
         }
+    }
+    
+    public function setHasMethodRestriction($hasMethodRestriction)
+    {
+        $this->hasMethodRestriction = $hasMethodRestriction ? true : false;
+    }
+    public function setHasVarRestriction($hasVarRestriction)
+    {
+        $this->hasVarRestriction = $hasVarRestriction ? true : false;
     }
     /**
      * Sets the value which will be set to the object valriables if reset() is called.
